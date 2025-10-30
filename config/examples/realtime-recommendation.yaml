@@ -1,0 +1,221 @@
+# Real-time Recommendation System Example
+# GPU-accelerated collaborative filtering for e-commerce
+
+use_case:
+  name: "Real-time Product Recommendation System"
+  slug: "realtime_recommendation"
+  domain: "MarTech"
+  description: "GPU-accelerated recommendation engine using collaborative filtering with cuML KNN"
+
+requirements:
+  primary_goal: "Generate personalized top-10 product recommendations in <50ms p99 latency"
+  data_scale:
+    training_samples: 10_000_000  # 10M user-product interactions
+    inference_throughput: "10K requests/sec"
+    features: 50  # User and product embeddings
+  latency_requirement:
+    target_p50_ms: 20
+    target_p99_ms: 50
+  model_types:
+    - "K-Nearest Neighbors (Collaborative Filtering)"
+    - "Matrix Factorization (optional)"
+
+technology_stack:
+  rapids:
+    cudf: true
+    cuml: true
+    cugraph: false
+    dask_cudf: false
+
+  tensorrt:
+    enabled: false
+    precision: "fp16"
+
+  model_framework: "cuML"
+  model_type: "KNN"
+
+  deployment:
+    target: "single_gpu"
+    api_framework: "fastapi"
+
+data:
+  sources:
+    training: "data/interactions/train.parquet"
+    validation: "data/interactions/val.parquet"
+    test: "data/interactions/test.parquet"
+
+  format: "parquet"
+
+  features:
+    - "user_id"
+    - "product_id"
+    - "rating"
+    - "timestamp"
+    - "category"
+    - "price"
+    - "user_age"
+    - "user_location"
+
+  target_variable: "rating"
+
+  splits:
+    train: 0.7
+    validation: 0.15
+    test: 0.15
+
+preprocessing:
+  steps:
+    - "remove_duplicates"
+    - "handle_missing_values"
+    - "filter_outliers"
+    - "encode_categorical"
+    - "normalize_features"
+
+  missing_values:
+    strategy: "drop"
+
+  outlier_detection:
+    method: "iqr"
+    threshold: 1.5
+
+  categorical_encoding:
+    method: "label"
+    columns:
+      - "category"
+      - "user_location"
+
+  normalization:
+    method: "minmax"
+    columns:
+      - "price"
+      - "user_age"
+      - "rating"
+
+feature_engineering:
+  time_features:
+    enabled: true
+    timestamp_column: "timestamp"
+    extract:
+      - "hour"
+      - "day_of_week"
+      - "is_weekend"
+
+  aggregations:
+    - group_by: ["user_id"]
+      agg_column: "rating"
+      functions: ["mean", "count", "std"]
+    - group_by: ["product_id"]
+      agg_column: "rating"
+      functions: ["mean", "count"]
+
+  interactions:
+    - columns: ["price", "user_rating_mean"]
+      operations: ["multiply"]
+
+  custom:
+    - name: "user_product_frequency"
+      description: "Number of times user viewed product category"
+    - name: "recency_score"
+      description: "Days since last interaction"
+
+model:
+  type: "KNN"
+  task: "recommendation"
+
+  params:
+    n_neighbors: 10
+    algorithm: "brute"
+    metric: "euclidean"
+
+  training:
+    epochs: 1  # KNN is non-iterative
+    batch_size: 10000
+    validation_split: 0.2
+
+  checkpoint_dir: "models/checkpoints"
+  save_best_only: true
+
+inference:
+  batch_size: 256
+  precision: "fp32"
+  max_latency_ms: 50
+  enable_tensorrt: false
+
+  api:
+    host: "0.0.0.0"
+    port: 8000
+    max_concurrent_requests: 100
+    timeout_sec: 5
+
+gpu:
+  enabled: true
+  device_id: 0
+  memory_fraction: 0.8
+  multi_gpu: false
+  num_gpus: 1
+  fallback_to_cpu: true
+
+dependencies:
+  rapids:
+    - "cudf-cu12>=24.10.0"
+    - "cuml-cu12>=24.10.0"
+
+  api:
+    - "fastapi>=0.104.0"
+    - "uvicorn>=0.24.0"
+    - "pydantic>=2.0.0"
+
+  utils:
+    - "pandas>=2.0.0"
+    - "scikit-learn>=1.3.0"
+    - "numpy>=1.24.0"
+    - "pyyaml>=6.0"
+
+benchmarking:
+  enable_cpu_baseline: true
+
+  data_pipeline:
+    data_sizes: [100_000, 1_000_000, 5_000_000]
+    metrics: ["load_time", "preprocess_time", "throughput"]
+
+  training:
+    data_sizes: [1_000_000, 5_000_000]
+    metrics: ["training_time", "samples_per_sec", "gpu_memory_usage"]
+
+  inference:
+    batch_sizes: [1, 8, 32, 128, 256]
+    num_requests: 1000
+    metrics: ["p50_latency", "p95_latency", "p99_latency", "throughput"]
+
+  expected_speedup:
+    data_loading: 15.0
+    preprocessing: 20.0
+    training: 30.0  # KNN fit on GPU is very fast
+    inference: 8.0
+
+environment:
+  python_version: "3.11"
+  cuda_version: "12.0"
+
+  development:
+    docker_image: "nvcr.io/nvidia/rapidsai/base:24.10-cuda12.0-py3.11"
+    local_fallback: true
+
+  production:
+    platform: "gcp"
+    instance_type: "n1-standard-8"
+    gpu_type: "T4"
+    kubernetes: false
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  log_dir: "logs"
+
+  metrics:
+    - "gpu_utilization"
+    - "gpu_memory_usage"
+    - "inference_latency"
+    - "throughput"
+    - "recommendation_accuracy"
+    - "ndcg@10"

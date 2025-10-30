@@ -1,0 +1,42 @@
+[project]
+name = "nvidia-toolkit-framework"
+version = "0.1.0"
+description = "Reusable framework for building GPU-accelerated ML toolkits with NVIDIA RAPIDS and TensorRT"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["nvidia", "rapids", "tensorrt", "gpu", "machine-learning", "framework"]
+
+dependencies = [
+    "pyyaml>=6.0",
+    "pydantic>=2.0.0",
+    "jinja2>=3.1.0",  # For template generation
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
