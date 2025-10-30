@@ -1,7 +1,16 @@
 # Architecture Design Prompt
 
 ## Objective
-Design the detailed system architecture for `{{USE_CASE_NAME}}` based on discovery phase findings.
+Design the detailed POC architecture for `{{USE_CASE_NAME}}` based on discovery phase findings.
+
+## Purpose
+This architecture is designed for:
+- **Learning**: Understanding how GPU acceleration works in practice
+- **Experimentation**: Testing different NVIDIA components
+- **Benchmarking**: Measuring real performance improvements
+- **Proof-of-Concept**: Validating approach before production investment
+
+**Important:** This generates POC-quality code. Production deployment requires additional work on error handling, security, monitoring, and optimization.
 
 ## Prerequisites
 Complete `01-use-case-discovery.md` first to determine technology stack.
@@ -168,15 +177,32 @@ dev = [
 
 ### 6. GPU Environment Considerations
 
-**Development Environment**:
-- Local CPU fallback mode: [yes/no]
+**Development Environment** (CPU mode for code development):
+- Local CPU fallback mode: yes (recommended for initial development)
 - Docker container specs: {{DOCKER_IMAGE}}
 - CUDA version: {{CUDA_VERSION}}
 
-**Production Environment**:
-- GCP VM instance type: {{GCP_INSTANCE}}
-- GPU type: {{GPU_MODEL}} (e.g., T4, V100, A100)
-- Kubernetes deployment: [yes/no]
+**POC Environment** (Choose based on learning goals):
+
+**Option A: NVIDIA Virtual Workstation (Recommended for Learning)**
+- Pre-configured CUDA environment
+- GPU type: Start with T4 or V100
+- Setup time: < 30 minutes
+- Cost: $2-5/hour
+- Best for: Learning, team training, initial POCs
+
+**Option B: GCP GPU Instance (Cost-Conscious)**
+- Instance type: `n1-standard-4` or `n1-standard-8`
+- GPU type: T4 (learning), V100 (medium POCs), A100 (performance testing)
+- Setup time: 1-2 hours (CUDA installation)
+- Cost: $0.35-0.95/hour (T4), $2-4/hour (A100)
+- Best for: Longer experiments, batch processing
+
+**Option C: Local GPU (If Available)**
+- Use local NVIDIA GPU for development
+- Best for: Continuous experimentation, no cloud costs
+
+**Note:** Kubernetes deployment is typically not needed for POC/learning phases.
 
 ### 7. Error Handling and Fallbacks
 

@@ -1,12 +1,38 @@
 # Benchmark Plan
 
 ## Objective
-Create comprehensive performance benchmarks comparing GPU-accelerated implementation against CPU baseline for `{{USE_CASE_NAME}}`.
+Create comprehensive performance benchmarks comparing GPU-accelerated POC implementation against CPU baseline for `{{USE_CASE_NAME}}`.
+
+## Purpose
+Benchmarking is critical for POC validation:
+- **Learn**: Understand where GPU acceleration provides the most benefit
+- **Measure**: Quantify actual speedups on your data and use case
+- **Validate**: Prove ROI of GPU acceleration before production investment
+- **Demonstrate**: Show stakeholders concrete performance improvements
+
+**Key POC Question to Answer:** "Is GPU acceleration worth it for this use case?"
 
 ## Prerequisites
 - Completed model implementation
 - Sample datasets for testing
 - Both GPU and CPU environments available (or CPU fallback mode)
+
+## Recommended Benchmark Environments
+
+**Option 1: NVIDIA Virtual Workstation** (Learning)
+- Pre-configured for benchmarking
+- Run CPU baseline in Docker or separate VM
+- Best for: Initial POC validation
+
+**Option 2: GCP Dual Setup** (Cost-Effective)
+- GPU instance: N1 + T4 for GPU benchmarks
+- CPU instance: N1 without GPU for CPU baseline
+- Run benchmarks in parallel, compare results
+
+**Option 3: Single Instance with CPU Mode** (Development)
+- Use `--device cpu` flag for CPU baseline
+- Use `--device gpu` flag for GPU tests
+- Convenient but not true apples-to-apples comparison
 
 ## Input Variables
 - `{{BENCHMARK_METRICS}}`: Metrics to measure (latency, throughput, memory, accuracy)

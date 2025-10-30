@@ -1,7 +1,16 @@
 # Project Scaffolding Generator
 
 ## Objective
-Generate complete project structure with boilerplate code for `{{USE_CASE_NAME}}`.
+Generate complete POC project structure with boilerplate code for `{{USE_CASE_NAME}}`.
+
+## Purpose
+This scaffold creates a proof-of-concept structure for:
+- **Learning**: Organized codebase to understand GPU acceleration components
+- **Experimentation**: Easy-to-modify structure for testing different approaches
+- **Benchmarking**: Built-in tools to measure GPU vs CPU performance
+- **Demonstration**: Clear structure to share POC results with stakeholders
+
+**Important:** This generates POC-quality scaffolding. Production readiness requires additional hardening.
 
 ## Prerequisites
 - Completed `planning/01-use-case-discovery.md`
@@ -71,9 +80,11 @@ Generate the following structure:
 │   ├── benchmark_inference.py
 │   └── compare_cpu_gpu.py
 ├── docker/
-│   ├── Dockerfile.gpu         # CUDA-enabled image
+│   ├── Dockerfile.rapids      # RAPIDS-based GPU image
 │   ├── Dockerfile.cpu         # CPU fallback image
-│   └── docker-compose.yml
+│   ├── docker-compose.yml     # Multi-container orchestration
+│   ├── .dockerignore          # Docker ignore patterns
+│   └── entrypoint.sh          # Container entrypoint script
 ├── scripts/
 │   ├── setup_env.sh           # Environment setup
 │   ├── download_data.sh       # Data acquisition
@@ -440,6 +451,626 @@ results = predictor.predict(input_data)
 Apache 2.0
 \`\`\`
 
+### 6. docker/Dockerfile.rapids
+
+**For RAPIDS Use Cases** (cuDF, cuML, cuGraph):
+
+```dockerfile
+# Dockerfile.rapids - RAPIDS-based GPU image for POC deployment
+# Based on official NVIDIA RAPIDS container images
+
+# Select RAPIDS version based on CUDA version
+# CUDA 12.x: use rapids:24.10-cuda12.0-py3.11
+# CUDA 11.x: use rapids:24.10-cuda11.8-py3.11
+ARG RAPIDS_VERSION=24.10
+ARG CUDA_VERSION=12.0
+ARG PYTHON_VERSION=3.11
+
+FROM nvcr.io/nvidia/rapidsai/base:${RAPIDS_VERSION}-cuda${CUDA_VERSION}-py${PYTHON_VERSION}
+
+# Set working directory
+WORKDIR /workspace
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy project files
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+COPY config/ ./config/
+COPY scripts/ ./scripts/
+
+# Install UV package manager for fast dependency resolution
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.cargo/bin:$PATH"
+
+# Install project dependencies
+# RAPIDS packages (cudf, cuml) are already included in base image
+RUN uv pip install --system -e .
+
+# Install additional dependencies based on use case
+{{#if NEEDS_XGBOOST}}
+RUN uv pip install --system xgboost
+{{/if}}
+{{#if NEEDS_TENSORRT}}
+RUN uv pip install --system tensorrt
+{{/if}}
+
+# Copy entrypoint script
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Create directories for data and models
+RUN mkdir -p /workspace/data /workspace/models /workspace/logs
+
+# Set environment variables
+ENV CUDA_VISIBLE_DEVICES=0
+ENV PYTHONUNBUFFERED=1
+ENV LOG_LEVEL=INFO
+
+# Expose ports for API server and Jupyter
+EXPOSE 8000 8888
+
+# Health check for API server
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["serve"]
+```
+
+### 7. docker/Dockerfile.cpu
+
+**For CPU Fallback/Development**:
+
+```dockerfile
+# Dockerfile.cpu - CPU-only image for development and testing
+FROM python:3.11-slim
+
+WORKDIR /workspace
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install UV package manager
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.cargo/bin:$PATH"
+
+# Copy project files
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+COPY config/ ./config/
+COPY scripts/ ./scripts/
+
+# Install project with CPU-only dependencies
+# Use pandas/sklearn instead of cudf/cuml
+RUN uv pip install --system -e .
+RUN uv pip install --system pandas scikit-learn
+
+# Copy entrypoint script
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Create directories
+RUN mkdir -p /workspace/data /workspace/models /workspace/logs
+
+ENV PYTHONUNBUFFERED=1
+ENV LOG_LEVEL=INFO
+ENV CUDA_VISIBLE_DEVICES=""
+
+EXPOSE 8000 8888
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["serve"]
+```
+
+### 8. docker/docker-compose.yml
+
+```yaml
+# docker-compose.yml - Multi-container orchestration for POC
+
+version: '3.8'
+
+services:
+  # GPU-accelerated service using RAPIDS
+  rapids-gpu:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.rapids
+      args:
+        RAPIDS_VERSION: ${RAPIDS_VERSION:-24.10}
+        CUDA_VERSION: ${CUDA_VERSION:-12.0}
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.11}
+    image: {{USE_CASE_SLUG}}:rapids-gpu
+    container_name: {{USE_CASE_SLUG}}-gpu
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - CONFIG_ENV=${CONFIG_ENV:-default}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ../data:/workspace/data
+      - ../models:/workspace/models
+      - ../logs:/workspace/logs
+      - ../config:/workspace/config
+    ports:
+      - "8000:8000"
+      - "8888:8888"
+    networks:
+      - {{USE_CASE_SLUG}}-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # CPU fallback service for comparison/testing
+  cpu-baseline:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cpu
+    image: {{USE_CASE_SLUG}}:cpu
+    container_name: {{USE_CASE_SLUG}}-cpu
+    environment:
+      - CUDA_VISIBLE_DEVICES=""
+      - CONFIG_ENV=${CONFIG_ENV:-default}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ../data:/workspace/data
+      - ../models:/workspace/models
+      - ../logs:/workspace/logs
+      - ../config:/workspace/config
+    ports:
+      - "8001:8000"
+      - "8889:8888"
+    networks:
+      - {{USE_CASE_SLUG}}-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Jupyter notebook server for interactive development (GPU)
+  jupyter-gpu:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.rapids
+    image: {{USE_CASE_SLUG}}:rapids-gpu
+    container_name: {{USE_CASE_SLUG}}-jupyter-gpu
+    runtime: nvidia
+    command: jupyter
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - JUPYTER_ENABLE_LAB=yes
+    volumes:
+      - ../notebooks:/workspace/notebooks
+      - ../data:/workspace/data
+      - ../models:/workspace/models
+      - ../src:/workspace/src
+    ports:
+      - "8890:8888"
+    networks:
+      - {{USE_CASE_SLUG}}-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+networks:
+  {{USE_CASE_SLUG}}-network:
+    driver: bridge
+
+volumes:
+  data:
+  models:
+  logs:
+```
+
+### 9. docker/entrypoint.sh
+
+```bash
+#!/bin/bash
+# entrypoint.sh - Container entrypoint script
+
+set -e
+
+# Function to wait for GPU availability
+wait_for_gpu() {
+    echo "Checking GPU availability..."
+    if command -v nvidia-smi &> /dev/null; then
+        nvidia-smi
+        echo "GPU is available"
+    else
+        echo "Warning: nvidia-smi not found, running in CPU mode"
+    fi
+}
+
+# Function to run training
+run_training() {
+    echo "Starting model training..."
+    python scripts/train.py \
+        --config "config/${CONFIG_ENV:-default}.yaml" \
+        --device gpu \
+        "$@"
+}
+
+# Function to run inference server
+run_serve() {
+    echo "Starting inference server..."
+    python scripts/serve.py \
+        --config "config/${CONFIG_ENV:-default}.yaml" \
+        --host 0.0.0.0 \
+        --port 8000 \
+        "$@"
+}
+
+# Function to run benchmarks
+run_benchmark() {
+    echo "Running benchmarks..."
+    python benchmarks/compare_cpu_gpu.py \
+        --config "config/${CONFIG_ENV:-default}.yaml" \
+        "$@"
+}
+
+# Function to run Jupyter notebook server
+run_jupyter() {
+    echo "Starting Jupyter notebook server..."
+    jupyter lab \
+        --ip=0.0.0.0 \
+        --port=8888 \
+        --no-browser \
+        --allow-root \
+        --NotebookApp.token='' \
+        --NotebookApp.password='' \
+        --notebook-dir=/workspace/notebooks
+}
+
+# Function to run custom command
+run_custom() {
+    echo "Running custom command: $@"
+    exec "$@"
+}
+
+# Wait for GPU if available
+wait_for_gpu
+
+# Route to appropriate function based on command
+case "$1" in
+    train)
+        shift
+        run_training "$@"
+        ;;
+    serve)
+        shift
+        run_serve "$@"
+        ;;
+    benchmark)
+        shift
+        run_benchmark "$@"
+        ;;
+    jupyter)
+        shift
+        run_jupyter "$@"
+        ;;
+    bash|sh)
+        exec /bin/bash
+        ;;
+    *)
+        run_custom "$@"
+        ;;
+esac
+```
+
+### 10. docker/.dockerignore
+
+```
+# Docker ignore patterns
+.git
+.github
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg-info
+.pytest_cache
+.coverage
+htmlcov/
+dist/
+build/
+*.egg
+
+# Data directories (mount as volumes instead)
+data/raw/*
+data/processed/*
+!data/sample
+
+# Model checkpoints (mount as volumes)
+models/checkpoints/*
+
+# Logs
+logs/*
+
+# Development files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests (install separately in dev)
+tests/
+```
+
+### 11. scripts/docker_build.sh
+
+```bash
+#!/bin/bash
+# docker_build.sh - Build Docker images for the project
+
+set -e
+
+PROJECT_NAME="{{USE_CASE_SLUG}}"
+RAPIDS_VERSION="${RAPIDS_VERSION:-24.10}"
+CUDA_VERSION="${CUDA_VERSION:-12.0}"
+PYTHON_VERSION="${PYTHON_VERSION:-3.11}"
+
+echo "Building Docker images for ${PROJECT_NAME}..."
+
+# Build RAPIDS GPU image
+echo "Building RAPIDS GPU image..."
+docker build \
+    -f docker/Dockerfile.rapids \
+    -t "${PROJECT_NAME}:rapids-gpu" \
+    -t "${PROJECT_NAME}:latest" \
+    --build-arg RAPIDS_VERSION="${RAPIDS_VERSION}" \
+    --build-arg CUDA_VERSION="${CUDA_VERSION}" \
+    --build-arg PYTHON_VERSION="${PYTHON_VERSION}" \
+    .
+
+# Build CPU image
+echo "Building CPU image..."
+docker build \
+    -f docker/Dockerfile.cpu \
+    -t "${PROJECT_NAME}:cpu" \
+    .
+
+echo "Docker images built successfully!"
+echo ""
+echo "Available images:"
+docker images | grep "${PROJECT_NAME}"
+echo ""
+echo "To run the GPU service:"
+echo "  docker run --gpus all -p 8000:8000 ${PROJECT_NAME}:rapids-gpu"
+echo ""
+echo "To run with docker-compose:"
+echo "  docker-compose -f docker/docker-compose.yml up -d"
+```
+
+### 12. scripts/docker_run.sh
+
+```bash
+#!/bin/bash
+# docker_run.sh - Run Docker containers with common configurations
+
+set -e
+
+PROJECT_NAME="{{USE_CASE_SLUG}}"
+COMMAND="${1:-serve}"
+
+case "$COMMAND" in
+    gpu|serve-gpu)
+        echo "Starting GPU inference server..."
+        docker run --gpus all \
+            -p 8000:8000 \
+            -v "$(pwd)/data:/workspace/data" \
+            -v "$(pwd)/models:/workspace/models" \
+            -v "$(pwd)/config:/workspace/config" \
+            -e CONFIG_ENV=default \
+            --name "${PROJECT_NAME}-gpu" \
+            --rm \
+            "${PROJECT_NAME}:rapids-gpu" \
+            serve
+        ;;
+
+    cpu|serve-cpu)
+        echo "Starting CPU inference server..."
+        docker run \
+            -p 8001:8000 \
+            -v "$(pwd)/data:/workspace/data" \
+            -v "$(pwd)/models:/workspace/models" \
+            -v "$(pwd)/config:/workspace/config" \
+            -e CUDA_VISIBLE_DEVICES="" \
+            -e CONFIG_ENV=default \
+            --name "${PROJECT_NAME}-cpu" \
+            --rm \
+            "${PROJECT_NAME}:cpu" \
+            serve
+        ;;
+
+    train-gpu)
+        echo "Starting GPU training..."
+        docker run --gpus all \
+            -v "$(pwd)/data:/workspace/data" \
+            -v "$(pwd)/models:/workspace/models" \
+            -v "$(pwd)/config:/workspace/config" \
+            -e CONFIG_ENV=default \
+            --name "${PROJECT_NAME}-train" \
+            --rm \
+            "${PROJECT_NAME}:rapids-gpu" \
+            train
+        ;;
+
+    benchmark)
+        echo "Running benchmarks..."
+        docker run --gpus all \
+            -v "$(pwd)/data:/workspace/data" \
+            -v "$(pwd)/models:/workspace/models" \
+            -v "$(pwd)/config:/workspace/config" \
+            --name "${PROJECT_NAME}-benchmark" \
+            --rm \
+            "${PROJECT_NAME}:rapids-gpu" \
+            benchmark
+        ;;
+
+    jupyter)
+        echo "Starting Jupyter notebook server..."
+        docker run --gpus all \
+            -p 8890:8888 \
+            -v "$(pwd)/notebooks:/workspace/notebooks" \
+            -v "$(pwd)/data:/workspace/data" \
+            -v "$(pwd)/models:/workspace/models" \
+            -v "$(pwd)/src:/workspace/src" \
+            --name "${PROJECT_NAME}-jupyter" \
+            --rm \
+            "${PROJECT_NAME}:rapids-gpu" \
+            jupyter
+        ;;
+
+    bash)
+        echo "Starting interactive bash shell..."
+        docker run --gpus all -it \
+            -v "$(pwd)/data:/workspace/data" \
+            -v "$(pwd)/models:/workspace/models" \
+            -v "$(pwd)/config:/workspace/config" \
+            --name "${PROJECT_NAME}-bash" \
+            --rm \
+            "${PROJECT_NAME}:rapids-gpu" \
+            bash
+        ;;
+
+    *)
+        echo "Usage: $0 {gpu|cpu|train-gpu|benchmark|jupyter|bash}"
+        echo ""
+        echo "Commands:"
+        echo "  gpu|serve-gpu  - Start GPU inference server (port 8000)"
+        echo "  cpu|serve-cpu  - Start CPU inference server (port 8001)"
+        echo "  train-gpu      - Run GPU training"
+        echo "  benchmark      - Run performance benchmarks"
+        echo "  jupyter        - Start Jupyter notebook server (port 8890)"
+        echo "  bash           - Start interactive bash shell"
+        exit 1
+        ;;
+esac
+```
+
+## Docker Usage Guide
+
+### Building Images
+
+```bash
+# Build all images
+./scripts/docker_build.sh
+
+# Or build with specific RAPIDS version
+RAPIDS_VERSION=24.10 CUDA_VERSION=12.0 ./scripts/docker_build.sh
+
+# Using docker-compose
+docker-compose -f docker/docker-compose.yml build
+```
+
+### Running Containers
+
+**GPU Inference Server:**
+```bash
+# Using helper script
+./scripts/docker_run.sh gpu
+
+# Or directly with docker
+docker run --gpus all -p 8000:8000 {{USE_CASE_SLUG}}:rapids-gpu serve
+
+# Or with docker-compose
+docker-compose -f docker/docker-compose.yml up rapids-gpu
+```
+
+**Training:**
+```bash
+# Using helper script
+./scripts/docker_run.sh train-gpu
+
+# Or with docker-compose
+docker-compose -f docker/docker-compose.yml run rapids-gpu train
+```
+
+**Jupyter Notebooks:**
+```bash
+# Using helper script
+./scripts/docker_run.sh jupyter
+
+# Or with docker-compose
+docker-compose -f docker/docker-compose.yml up jupyter-gpu
+# Access at http://localhost:8890
+```
+
+**Benchmarking:**
+```bash
+# Run GPU vs CPU comparison
+./scripts/docker_run.sh benchmark
+
+# Or run both services and compare
+docker-compose -f docker/docker-compose.yml up rapids-gpu cpu-baseline
+```
+
+### Docker Deployment Tips
+
+**For NVIDIA Virtual Workstation:**
+- NVIDIA Container Toolkit pre-installed
+- Use `--gpus all` or `--runtime=nvidia`
+- Monitor with `nvidia-smi` from host
+
+**For GCP GPU Instances:**
+- Install NVIDIA Container Toolkit:
+  ```bash
+  distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+  curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+  curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+    sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+  sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+  sudo systemctl restart docker
+  ```
+
+**For Cloud Deployment:**
+- Use Docker registry (GCR, ECR, Docker Hub)
+- Tag images with versions: `{{USE_CASE_SLUG}}:v0.1.0-rapids-gpu`
+- Use kubernetes manifests in `.github/kubernetes/`
+
 ## Scaffolding Checklist
 
 Generate the following files in order:
@@ -453,6 +1084,13 @@ Generate the following files in order:
 - [ ] src/{{USE_CASE_SLUG}}/utils/logging.py
 - [ ] src/{{USE_CASE_SLUG}}/data/__init__.py (stub)
 - [ ] src/{{USE_CASE_SLUG}}/models/__init__.py (stub)
+- [ ] docker/Dockerfile.rapids
+- [ ] docker/Dockerfile.cpu
+- [ ] docker/docker-compose.yml
+- [ ] docker/entrypoint.sh
+- [ ] docker/.dockerignore
+- [ ] scripts/docker_build.sh
+- [ ] scripts/docker_run.sh
 - [ ] tests/conftest.py
 - [ ] .gitignore
 - [ ] README.md
@@ -464,3 +1102,4 @@ After scaffolding:
 - Proceed to `data-pipeline.md` for data processing implementation
 - Use `model-implementation.md` for training/inference code
 - Reference `validation/benchmark-plan.md` for testing strategy
+- Test Docker images locally before deploying to GPU environment

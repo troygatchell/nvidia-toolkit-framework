@@ -1,7 +1,16 @@
 # Data Pipeline Implementation
 
 ## Objective
-Implement GPU-accelerated data loading, preprocessing, and feature engineering for `{{USE_CASE_NAME}}`.
+Implement GPU-accelerated data loading, preprocessing, and feature engineering for `{{USE_CASE_NAME}}` POC.
+
+## Purpose
+This data pipeline helps you:
+- **Learn**: Understand cuDF operations and GPU-accelerated data processing
+- **Experiment**: Compare GPU vs CPU data processing performance
+- **Benchmark**: Measure actual speedups on your data
+- **Demonstrate**: Show stakeholders the value of GPU acceleration
+
+**Important:** This is POC-quality code. Production requires additional error handling, data validation, and monitoring.
 
 ## Prerequisites
 - Completed scaffolding from `scaffold-generator.md`

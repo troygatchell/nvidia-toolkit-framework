@@ -1,13 +1,43 @@
 # Quick Start Guide
 
-Get started with the NVIDIA Toolkit Framework in 10 minutes.
+Get started with the NVIDIA Toolkit Framework in 10 minutes to build your first GPU-accelerated proof-of-concept.
+
+## What You'll Learn
+
+This guide will help you:
+- Build a GPU-accelerated ML proof-of-concept
+- Understand CUDA and NVIDIA RAPIDS capabilities
+- Benchmark GPU vs CPU performance for your use case
+- Experiment with different NVIDIA technologies
+
+**Important:** This framework generates POC code for learning and experimentation. Additional work is needed for production deployment.
 
 ## Prerequisites
 
 - Python 3.10 or later
 - UV package manager (install: `curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - Claude Code or similar AI agent (optional but recommended)
-- NVIDIA GPU with CUDA 12.0+ (optional for development)
+- NVIDIA GPU with CUDA 12.0+ (optional for development - CPU mode available)
+
+## Choosing Your GPU Environment
+
+### For Learning & Initial POCs (Recommended)
+**NVIDIA Virtual Workstation** - Pre-configured CUDA environment, minimal setup
+- Pros: Ready to use, great for beginners, consistent environment
+- Cons: Higher cost ($2-5/hour)
+- Best for: Learning, team training, quick POCs
+
+### For Cost-Conscious POCs
+**GCP N1 + T4 GPU** - Manual setup required, lower cost
+- Pros: Lower cost ($0.35-0.95/hour), flexible
+- Cons: Requires CUDA setup, more configuration, GPU availability limitations
+- Best for: Longer-running POCs, batch experiments
+
+### For Development/Testing
+**Local CPU Mode** - No GPU required
+- Pros: Free, good for code development
+- Cons: No GPU acceleration (can't validate performance)
+- Best for: Initial development, testing logic
 
 ## Step-by-Step Guide
 
@@ -74,7 +104,7 @@ model:
 
 ### 3. Follow the Prompt Workflow
 
-#### Using with Claude Code (Recommended)
+#### Using with Claude Code or Github Copilot
 
 1. Start Claude Code in your working directory:
 ```bash
@@ -172,37 +202,75 @@ python benchmarks/benchmark_data_pipeline.py --data data/sample/train.parquet
 
 ### 6. Deploy to GPU Environment
 
-#### Option A: Local GPU
+#### Option A: NVIDIA Virtual Workstation (Recommended for Learning)
+
+```bash
+# CUDA and drivers are pre-installed!
+# Just verify GPU is available
+nvidia-smi
+
+# Setup your POC
+git clone <your-generated-repo>
+cd product-recommendations
+uv venv && source .venv/bin/activate
+uv pip install -e .
+
+# Install RAPIDS (CUDA compatibility already handled)
+uv pip install cudf-cu12 cuml-cu12
+
+# Train on GPU and see the speedup!
+python scripts/train.py --data data/train.parquet --device gpu
+
+# Monitor GPU utilization in another terminal
+watch -n 1 nvidia-smi
+
+# Start API server for testing
+python scripts/serve.py
+```
+
+**Learning Tips:**
+- Compare execution time between `--device cpu` and `--device gpu`
+- Watch `nvidia-smi` to see GPU memory usage and utilization
+- Run benchmarks to measure actual speedup: `python benchmarks/benchmark_training.py`
+- Create a snapshot after setup for quick restarts
+
+#### Option B: GCP N1 + T4 GPU (Cost-Conscious POCs)
+
+```bash
+# On GCP GPU instance
+# First-time setup: Install CUDA drivers
+curl https://raw.githubusercontent.com/GoogleCloudPlatform/compute-gpu-installation/main/linux/install_gpu_driver.py --output install_gpu_driver.py
+sudo python3 install_gpu_driver.py
+
+# OR use RAPIDS Docker to skip manual setup
+docker run --gpus all --rm -it \
+  -v $(pwd):/workspace \
+  nvcr.io/nvidia/rapidsai/base:24.10-cuda12.0-py3.11
+
+# Inside container or on host with CUDA installed
+git clone <your-generated-repo>
+cd product-recommendations
+uv venv && source .venv/bin/activate
+uv pip install -e . cudf-cu12 cuml-cu12
+
+python scripts/train.py --data data/train.parquet --device gpu
+```
+
+**Cost-Saving Tips:**
+- Use preemptible instances for batch experiments (70% cheaper)
+- Stop instance when not in use
+- Start with smaller datasets for initial testing
+
+#### Option C: Local GPU (If Available)
 
 ```bash
 # Ensure CUDA is available
 nvidia-smi
 
-# Install RAPIDS
-uv pip install cudf-cu12 cuml-cu12
+# Install RAPIDS matching your CUDA version
+uv pip install cudf-cu12 cuml-cu12  # For CUDA 12.x
 
 # Train on GPU
-python scripts/train.py --data data/train.parquet --device gpu
-
-# Start API server
-python scripts/serve.py
-```
-
-#### Option B: GCP Virtual Workstation
-
-```bash
-# On GCP VM with GPU
-git clone <your-generated-repo>
-cd product-recommendations
-
-# Use RAPIDS Docker container
-docker run --gpus all --rm -it \
-  -v $(pwd):/workspace \
-  nvcr.io/nvidia/rapidsai/base:24.10-cuda12.0-py3.11
-
-# Inside container
-cd /workspace
-uv pip install -e .
 python scripts/train.py --data data/train.parquet --device gpu
 ```
 

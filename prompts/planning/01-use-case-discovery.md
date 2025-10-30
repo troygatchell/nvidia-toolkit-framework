@@ -1,7 +1,16 @@
 # Use Case Discovery Prompt
 
 ## Objective
-Analyze the target use case and determine optimal GPU acceleration strategy using NVIDIA RAPIDS and/or TensorRT.
+Analyze the target use case and determine optimal GPU acceleration strategy using NVIDIA RAPIDS and/or TensorRT for **proof-of-concept development and learning**.
+
+## Purpose
+This prompt guides you through building a POC to:
+- **Learn** about GPU acceleration benefits for your specific use case
+- **Experiment** with NVIDIA RAPIDS and TensorRT technologies
+- **Validate** potential performance gains before production investment
+- **Benchmark** GPU vs CPU performance with real data
+
+**Note:** This will generate POC code for learning and experimentation, not production-ready implementations.
 
 ## Input Variables
 Replace these variables when customizing for your use case:
@@ -87,15 +96,34 @@ cuml-cu12 = ">=24.10.0"
 - HuggingFace models: `{{MODEL_NAMES}}`
 - Pre-trained weights: `{{WEIGHT_SOURCES}}`
 
+## Recommended GPU Environment for POC
+
+**For Learning & Initial POCs:**
+- **NVIDIA Virtual Workstation**: Pre-configured CUDA, minimal setup, ideal for beginners
+  - Setup time: < 30 minutes
+  - Cost: $2-5/hour
+  - Best for: Learning, team training, initial POC development
+
+**For Cost-Conscious POCs:**
+- **GCP N1 + T4 GPU**: Lower cost, requires CUDA setup
+  - Setup time: 1-2 hours
+  - Cost: $0.35-0.95/hour
+  - Best for: Longer experiments, batch processing
+
+**For Development:**
+- **CPU Mode**: Free, no GPU required
+  - Best for: Code development, logic testing (no performance validation)
+
 ## Output Specification
 
-Generate a structured plan with:
+Generate a structured POC plan with:
 
-1. **Technology Stack**: List of RAPIDS/TensorRT components
-2. **Data Pipeline**: cuDF transformations, feature engineering steps
-3. **Model Architecture**: Training and inference approach
-4. **Performance Benchmarks**: Target metrics vs CPU baseline
-5. **Deployment Strategy**: Single GPU, multi-GPU, or distributed
+1. **Technology Stack**: List of RAPIDS/TensorRT components to experiment with
+2. **Data Pipeline**: cuDF transformations, feature engineering steps for POC
+3. **Model Architecture**: Training and inference approach for learning
+4. **Performance Benchmarks**: Target metrics vs CPU baseline to measure speedup
+5. **Deployment Strategy**: Single GPU (typical for POC), multi-GPU if needed for learning
+6. **Learning Objectives**: What CUDA/NVIDIA capabilities this POC will demonstrate
 
 ## Next Steps
 

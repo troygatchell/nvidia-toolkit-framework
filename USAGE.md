@@ -1,6 +1,16 @@
 # Framework Usage Guide
 
-Complete guide to using the NVIDIA Toolkit Framework for building GPU-accelerated ML systems.
+Complete guide to using the NVIDIA Toolkit Framework for building GPU-accelerated ML proof-of-concepts and learning CUDA/NVIDIA capabilities.
+
+## Purpose of This Framework
+
+This framework is designed for:
+- **Learning**: Understanding GPU acceleration benefits and CUDA capabilities
+- **Proof-of-Concepts**: Rapid prototyping to validate GPU acceleration potential
+- **Experimentation**: Testing different NVIDIA technologies (RAPIDS, TensorRT)
+- **Benchmarking**: Measuring actual speedups for your specific use cases
+
+This is **not** production-ready code. Generated toolkits require additional hardening, security review, error handling, and optimization before production deployment.
 
 ## Quick Reference
 
@@ -272,33 +282,68 @@ docker build -f docker/Dockerfile.gpu -t my-use-case:gpu .
 docker run --gpus all -p 8000:8000 my-use-case:gpu
 ```
 
-#### Option B: GCP Virtual Workstation
+#### Option B: NVIDIA Virtual Workstation (Recommended for Learning)
+
+NVIDIA Virtual Workstation provides pre-configured CUDA environment ideal for POCs:
 
 ```bash
-# On GCP VM with GPU
+# On NVIDIA Virtual Workstation (CUDA pre-installed)
 git clone <your-repo>
 cd my-use-case
 
-# Install RAPIDS
+# Setup environment
+uv venv && source .venv/bin/activate
+uv pip install -e .
+
+# Verify GPU
+nvidia-smi
+
+# Install RAPIDS (CUDA drivers already configured)
 uv pip install cudf-cu12 cuml-cu12
 
 # Run training
-python scripts/train.py --data gs://bucket/train.parquet --device gpu
+python scripts/train.py --data data/train.parquet --device gpu
 
-# Start API server
+# Start API server for testing
 python scripts/serve.py --host 0.0.0.0 --port 8000
 ```
 
-#### Option C: Kubernetes
+**Tips for Virtual Workstation:**
+- CUDA toolkit and drivers pre-installed - skip manual setup
+- Use GPU monitoring: `watch -n 1 nvidia-smi`
+- Create snapshots after environment setup for quick restarts
+- Remember to shut down when not in use to save costs
+
+#### Option C: GCP GPU Instance (For Cost-Conscious POCs)
+
+```bash
+# On GCP N1 + T4 instance
+# First, install CUDA drivers (one-time setup)
+curl https://raw.githubusercontent.com/GoogleCloudPlatform/compute-gpu-installation/main/linux/install_gpu_driver.py --output install_gpu_driver.py
+sudo python3 install_gpu_driver.py
+
+# Or use RAPIDS Docker to skip setup
+docker run --gpus all -v $(pwd):/workspace -it \
+  nvcr.io/nvidia/rapidsai/base:24.10-cuda12.0-py3.11
+
+# Inside container
+cd /workspace/my-use-case
+uv pip install -e .
+python scripts/train.py --data data/train.parquet --device gpu
+```
+
+#### Option D: Kubernetes (Advanced POC Deployment)
+
+Note: Kubernetes deployment is typically not needed for POC/learning. Consider this only for multi-user POC demonstrations.
 
 ```yaml
 # deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-use-case
+  name: my-use-case-poc
 spec:
-  replicas: 2
+  replicas: 1  # Start with 1 for POC
   template:
     spec:
       containers:

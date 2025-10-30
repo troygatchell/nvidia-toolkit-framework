@@ -1,7 +1,16 @@
 # Model Implementation Prompt
 
 ## Objective
-Implement GPU-accelerated model training and inference for `{{USE_CASE_NAME}}`.
+Implement GPU-accelerated model training and inference for `{{USE_CASE_NAME}}` POC.
+
+## Purpose
+This model implementation helps you:
+- **Learn**: Understand GPU-accelerated ML training (cuML, XGBoost GPU)
+- **Experiment**: Test different NVIDIA ML frameworks
+- **Benchmark**: Measure training and inference speedups
+- **Validate**: Prove GPU acceleration value for your use case
+
+**Important:** This is POC-quality code for learning and experimentation. Production deployment requires additional work on model validation, monitoring, versioning, and A/B testing.
 
 ## Prerequisites
 - Completed data pipeline from `data-pipeline.md`
