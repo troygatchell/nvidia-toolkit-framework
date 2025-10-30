@@ -12,6 +12,14 @@ This framework is designed for:
 
 This is **not** production-ready code. Generated toolkits require additional hardening, security review, error handling, and optimization before production deployment.
 
+## Supported Platforms
+
+- **macOS**: Local CPU development and testing (no GPU support)
+- **Ubuntu 20.04/22.04**: GPU virtual workstations (NVIDIA Virtual Workstation, GCP, AWS, Azure)
+- **Windows**: Not supported
+
+All examples and scripts are designed for bash shell environments (macOS/Ubuntu).
+
 ## Quick Reference
 
 ```bash

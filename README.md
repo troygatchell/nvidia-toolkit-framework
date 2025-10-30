@@ -202,13 +202,20 @@ Expected GPU speedups (vs CPU baseline):
 
 ## Requirements
 
+### Supported Platforms
+- **macOS**: For local CPU development and testing
+- **Ubuntu 20.04/22.04**: For GPU virtual workstations and production POCs
+- **Windows**: Not supported
+
 ### Development (CPU mode)
 - Python 3.10+
 - UV package manager
 - 8GB+ RAM
+- macOS or Ubuntu
 
 ### Production (GPU mode)
 - Python 3.10+
+- Ubuntu 20.04/22.04
 - NVIDIA GPU with CUDA 11.8+ or 12.0+
 - RAPIDS 24.10+
 - 16GB+ GPU memory (recommended)

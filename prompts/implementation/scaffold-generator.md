@@ -400,12 +400,18 @@ GPU-accelerated {{USE_CASE_NAME}} using NVIDIA RAPIDS and TensorRT.
 
 ### Prerequisites
 
+**Supported Platforms:**
+- macOS (local CPU development)
+- Ubuntu 20.04/22.04 (GPU virtual workstations)
+
+**Requirements:**
 - Python 3.10+
-- NVIDIA GPU with CUDA 12.0+
 - UV package manager
+- NVIDIA GPU with CUDA 12.0+ (for GPU mode)
 
 ### Installation
 
+**macOS (Local Development):**
 \`\`\`bash
 # Clone repository
 git clone <repo-url>
@@ -413,8 +419,23 @@ cd {{USE_CASE_SLUG}}
 
 # Create environment and install dependencies
 uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 uv pip install -e ".[dev]"
+\`\`\`
+
+**Ubuntu (Virtual Workstation/GCP):**
+\`\`\`bash
+# Clone repository
+git clone <repo-url>
+cd {{USE_CASE_SLUG}}
+
+# Create environment and install dependencies
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
+
+# Install RAPIDS for GPU (if on GPU instance)
+uv pip install cudf-cu12 cuml-cu12
 \`\`\`
 
 ### Usage
@@ -826,9 +847,8 @@ logs/*
 *.swo
 *~
 
-# OS files
+# OS files (macOS/Ubuntu)
 .DS_Store
-Thumbs.db
 
 # Documentation
 docs/

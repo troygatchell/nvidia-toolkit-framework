@@ -233,6 +233,5 @@ benchmark_results/
 # Generated toolkits (optional - uncomment if you don't want to track them)
 # starter_kits/*/
 
-# OS
+# OS-specific (macOS/Ubuntu focus)
 .DS_Store
-Thumbs.db

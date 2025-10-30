@@ -43,6 +43,7 @@ This guide will help you:
 
 ### 1. Set Up the Framework
 
+**macOS (Local Development):**
 ```bash
 # Clone the framework repository
 git clone https://github.com/your-org/nvidia-toolkit-framework.git
@@ -50,9 +51,23 @@ cd nvidia-toolkit-framework
 
 # Install framework dependencies (optional, for template generation)
 uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 uv pip install -e ".[dev]"
 ```
+
+**Ubuntu (Virtual Workstation/GCP):**
+```bash
+# Clone the framework repository
+git clone https://github.com/your-org/nvidia-toolkit-framework.git
+cd nvidia-toolkit-framework
+
+# Install framework dependencies (optional, for template generation)
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
+```
+
+**Note:** This framework is designed for macOS (local CPU development) and Ubuntu (GPU virtual workstations). Windows is not supported.
 
 ### 2. Create Your Use Case Configuration
 
